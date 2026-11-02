@@ -1,4 +1,4 @@
-"""Application settings loaded from environment variables and an optional .env file."""
+"""Typed application settings loaded from environment variables and a .env file."""
 
 import os
 from dataclasses import dataclass
@@ -13,6 +13,7 @@ class Settings:
     polling_api_key: str
     bank_base_url: str
     database_url: str
+    poll_interval_seconds: int
 
 
 def get_settings() -> Settings:
@@ -22,5 +23,9 @@ def get_settings() -> Settings:
             "BANK_BASE_URL",
             "https://bank-integration-lab.openaigoogle.workers.dev",
         ),
-        database_url=os.getenv("DATABASE_URL", "sqlite:///./forge.db"),
+        database_url=os.getenv(
+            "DATABASE_URL",
+            "postgresql+psycopg://forge:forge@localhost:5432/forge",
+        ),
+        poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "30")),
     )

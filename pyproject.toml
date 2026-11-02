@@ -1,0 +1,6 @@
+# Basic Ruff linting configuration for the Forge project.
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

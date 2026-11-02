@@ -1,6 +1,6 @@
 # Forge
 
-Project setup and application documentation will go here.
+Forge is a Wise-style multi-customer euro ledger.
 
 ## Run the database
 
