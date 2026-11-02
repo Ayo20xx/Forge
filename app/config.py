@@ -22,5 +22,5 @@ def get_settings() -> Settings:
             "BANK_BASE_URL",
             "https://bank-integration-lab.openaigoogle.workers.dev",
         ),
-        database_url=os.getenv("DATABASE_URL", "sqlite:///./tallybank.db"),
+        database_url=os.getenv("DATABASE_URL", "sqlite:///./forge.db"),
     )
