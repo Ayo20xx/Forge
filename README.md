@@ -1,6 +1,6 @@
 # Forge
 
-Forge is a Wise-style multi-customer euro ledger.
+Forge .
 
 ## Run the database
 
