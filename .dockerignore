@@ -1,0 +1,12 @@
+# Keeps secrets, local environments, and generated files out of the image build context.
+
+.env
+.env.*
+!.env.example
+.git
+.venv
+__pycache__
+.pytest_cache
+.ruff_cache
+*.py[cod]
+tests

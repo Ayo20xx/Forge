@@ -1,23 +1,36 @@
-# Runs the local Postgres database for Forge and keeps data in a named volume.
+# Runs Forge and its local Postgres database for development.
 services:
   db:
     image: postgres:16
-    container_name: forge-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-forge}
-      POSTGRES_USER: ${POSTGRES_USER:-forge}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forge}
+      POSTGRES_DB: forge
+      POSTGRES_USER: forge
+      POSTGRES_PASSWORD: forge
     ports:
       - "5432:5432"
     volumes:
       - forge_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-forge} -d ${POSTGRES_DB:-forge}"]
+      test: ["CMD-SHELL", "pg_isready -U forge -d forge"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 5s
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POLLING_API_KEY: ${POLLING_API_KEY:-}
+      BANK_BASE_URL: ${BANK_BASE_URL:-https://bank-integration-lab.openaigoogle.workers.dev}
+      DATABASE_URL: postgresql+psycopg://forge:forge@db:5432/forge
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-30}
+    ports:
+      - "8000:8000"
 
 volumes:
   forge_pgdata:
