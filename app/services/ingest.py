@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from sqlalchemy.orm import Session
 
-from app.bank_client import BankTransfer
+from app.services.bank_client import BankTransfer
 
 
 def ingest_batch(

@@ -2,7 +2,7 @@
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.bank_client import PollingBankClient
+from app.services.bank_client import PollingBankClient
 
 
 def run_poller(

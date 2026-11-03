@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.bank_client import BankError, PollingBankClient, get_bank_client
 from app.db import get_session
 from app.models import BankAccount
 from app.schemas import BankAccountCreate, BankAccountResponse, ReconciliationResponse
-from app.services import (
+from app.services.bank_client import BankError, PollingBankClient, get_bank_client
+from app.services.services import (
     BankAccountConflict,
     create_bank_account,
     get_stored_transaction_total,

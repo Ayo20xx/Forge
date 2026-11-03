@@ -4,8 +4,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.bank_client import BankAccount as BankAccountData
 from app.models import BankAccount, BankTransaction
+from app.services.bank_client import BankAccount as BankAccountData
 
 
 class BankAccountConflict(Exception):

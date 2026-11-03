@@ -3,10 +3,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.bank_client import BankError, PollingBankClient, get_bank_client
 from app.db import get_session
 from app.schemas import BankAccountResponse, SyncResponse
-from app.services import BankAccountConflict, sync_bank_accounts
+from app.services.bank_client import BankError, PollingBankClient, get_bank_client
+from app.services.services import BankAccountConflict, sync_bank_accounts
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
