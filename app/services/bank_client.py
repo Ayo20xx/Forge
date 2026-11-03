@@ -113,6 +113,12 @@ class PollingBankClient:
             "/polling-bank/accounts",
             json={"customer_reference": customer_reference},
         )
+        for field in ("bank_id", "account_id", "customer_reference", "iban"):
+            value = payload.get(field)
+            if not isinstance(value, str) or not value:
+                raise BankError("Polling Bank returned an invalid account response")
+        if payload["customer_reference"] != customer_reference:
+            raise BankError("Polling Bank returned an account for a different customer")
         return cast(BankAccount, payload)
 
     def get_balance(self, account_id: str) -> BankAccount:

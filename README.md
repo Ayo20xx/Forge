@@ -83,20 +83,17 @@ values at runtime.
 
 ## Tests and lint
 
-Start the local Postgres service first, then run:
+Run the test suite with:
 
 ```bash
 python -m pip install -r requirements.txt
 ruff check .
-pytest -q
+python -m pytest -q
 ```
 
-Database tests create a separate `forge_test` database using the configured
-Postgres connection, and drop only that database when the test session ends.
-They refuse to overwrite a pre-existing `forge_test`. Tests never call the
-Polling Bank over the network: HTTP behavior uses `httpx.MockTransport`, and
-the API fixture uses a scriptable fake bank client. Skipped tests describe
-business behavior that is intentionally left for you to implement.
+The bank-account endpoint tests use isolated in-memory SQLite sessions and a
+fake bank client. Polling Bank HTTP response validation uses
+`httpx.MockTransport`; tests do not call the bank or require Postgres.
 
 ## Polling Bank interface
 
