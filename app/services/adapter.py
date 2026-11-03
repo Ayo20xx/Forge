@@ -15,6 +15,8 @@ class Transfer:
     transaction_id: str
     amount_minor: int
     currency: str
+    transfer_type: str
+    status: str
     booked_balance_minor: int
     account_version: int
     sequence: int
@@ -34,6 +36,8 @@ class PollingAdapter:
         customer_reference = self._required_string(event, "customer_reference")
         transaction_id = self._required_string(event, "transaction_id")
         currency = self._required_string(event, "currency")
+        transfer_type = self._required_string(event, "type")
+        status = self._required_string(event, "status")
         amount_minor = self._required_integer(event, "amount_minor")
         booked_balance_minor = self._required_integer(event, "booked_balance_minor")
         account_version = self._required_integer(event, "account_version")
@@ -52,6 +56,8 @@ class PollingAdapter:
             transaction_id=transaction_id,
             amount_minor=amount_minor,
             currency=currency,
+            transfer_type=transfer_type,
+            status=status,
             booked_balance_minor=booked_balance_minor,
             account_version=account_version,
             sequence=sequence,

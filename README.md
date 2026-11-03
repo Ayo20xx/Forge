@@ -72,6 +72,9 @@ service; Forge does not create or own a customer record.
 Polling Bank transaction events are normalized by `PollingAdapter` before
 ingestion. The normalized `Transfer` keeps the event amount separate from the
 bank balance snapshot and retains the original event payload for auditing.
+`ingest_batch` commits each page's mapped transactions, pending outbox messages,
+parked events, and bank cursor as one transaction. Duplicate transaction IDs
+are ignored, and only booked EUR credits are accepted for mapped accounts.
 
 ## Docker setup
 

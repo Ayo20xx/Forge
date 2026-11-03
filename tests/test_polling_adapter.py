@@ -37,6 +37,8 @@ def test_polling_adapter_normalizes_bank_event(bank_event):
         transaction_id="transaction-1",
         amount_minor=1250,
         currency="EUR",
+        transfer_type="credit",
+        status="booked",
         booked_balance_minor=9000,
         account_version=1,
         sequence=42,

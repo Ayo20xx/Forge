@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     CheckConstraint,
     DateTime,
@@ -20,6 +21,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     pass
+
+
+json_payload_type = JSON().with_variant(JSONB, "postgresql")
 
 
 class BankAccount(Base):
@@ -73,7 +77,7 @@ class BankTransaction(Base):
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    raw_payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    raw_payload: Mapped[dict[str, object]] = mapped_column(json_payload_type, nullable=False)
 
 
 class PollCursor(Base):
@@ -88,12 +92,17 @@ class PollCursor(Base):
 
 class UnmappedTransaction(Base):
     __tablename__ = "unmapped_transactions"
+    __table_args__ = (
+        UniqueConstraint(
+            "bank_id", "transaction_id", name="uq_unmapped_bank_transaction"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     bank_id: Mapped[str] = mapped_column(String(64), nullable=False)
     account_id: Mapped[str] = mapped_column(String(128), nullable=False)
     transaction_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    raw_payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    raw_payload: Mapped[dict[str, object]] = mapped_column(json_payload_type, nullable=False)
     reason: Mapped[str] = mapped_column(String(500), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -118,7 +127,7 @@ class OutboxEvent(Base):
     event_type: Mapped[str] = mapped_column(
         String(64), nullable=False, server_default=text("'balance.update'")
     )
-    payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    payload: Mapped[dict[str, object]] = mapped_column(json_payload_type, nullable=False)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=text("'pending'")
     )
