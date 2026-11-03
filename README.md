@@ -69,6 +69,10 @@ transaction total with the bank's current booked balance:
 The customer reference is an opaque identifier passed through from the core
 service; Forge does not create or own a customer record.
 
+Polling Bank transaction events are normalized by `PollingAdapter` before
+ingestion. The normalized `Transfer` keeps the event amount separate from the
+bank balance snapshot and retains the original event payload for auditing.
+
 ## Docker setup
 
 With `.env` populated, start both Postgres and the API:
