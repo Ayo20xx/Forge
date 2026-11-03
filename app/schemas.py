@@ -1,42 +1,34 @@
-# Defines validated API shapes so business rules can be implemented separately.
+# Defines validated request and response shapes for the bank integration API.
 
 from pydantic import BaseModel, Field
 
 
-class UserCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+class BankAccountCreate(BaseModel):
+    customer_reference: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
 
 
-class UserResponse(BaseModel):
+class BankAccountResponse(BaseModel):
     id: int
-    name: str
+    bank_id: str
+    account_id: str
+    iban: str
     customer_reference: str
-    account_id: str | None = None
-    iban: str | None = None
+
+    model_config = {"from_attributes": True}
 
 
-class AdminSyncResponse(BaseModel):
-    imported_accounts: int
+class SyncResponse(BaseModel):
+    imported_count: int
+    accounts: list[BankAccountResponse]
 
 
-class BalanceResponse(BaseModel):
-    user_id: int
-    ledger_balance_minor: int
+class ReconciliationResponse(BaseModel):
+    account_id: str
+    stored_total_minor: int
     bank_balance_minor: int
+    difference_minor: int
     matches: bool
-
-
-class TransferCreate(BaseModel):
-    from_user_id: int
-    to_user_id: int
-    # Amounts are integer EUR cents; never use floating-point values.
-    amount_minor: int = Field(gt=0)
-
-
-class TransferResponse(BaseModel):
-    id: int
-    from_user_id: int
-    to_user_id: int
-    amount_minor: int
-    idempotency_key: str
-

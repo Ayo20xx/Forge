@@ -2,13 +2,11 @@
 
 from fastapi import FastAPI
 
-from app.routers import admin, balance, transfers, users
+from app.routers import admin, bank_accounts
 
 app = FastAPI(title="Forge")
 app.include_router(admin.router)
-app.include_router(users.router)
-app.include_router(balance.router)
-app.include_router(transfers.router)
+app.include_router(bank_accounts.router)
 
 
 @app.get("/health")

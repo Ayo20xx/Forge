@@ -58,9 +58,16 @@ Run the API locally:
 uvicorn app.main:app --reload
 ```
 
-The health endpoint is `http://localhost:8000/health`. The route and business
-logic modules are deliberate TODO stubs; health is the only implemented API
-behavior at this stage.
+The health endpoint is `http://localhost:8000/health`. The integration routes
+create a bank account, import existing bank accounts, and reconcile a stored
+transaction total with the bank's current booked balance:
+
+- `POST /bank-accounts` with a core-owned `customer_reference`
+- `POST /admin/sync`
+- `GET /bank-accounts/{account_id}/reconciliation`
+
+The customer reference is an opaque identifier passed through from the core
+service; Forge does not create or own a customer record.
 
 ## Docker setup
 

@@ -1,1 +1,1 @@
-# Groups the API routers that will be included by the Forge FastAPI application.
+# Groups the bank integration routers included by the Forge FastAPI application.
