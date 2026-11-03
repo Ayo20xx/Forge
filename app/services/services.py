@@ -100,7 +100,3 @@ def get_stored_transaction_total(session: Session, bank_account: BankAccount) ->
     )
     return int(stored_total or 0)
 
-
-def sync_accounts_service(session:Session):
-    pass
-

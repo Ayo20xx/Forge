@@ -75,6 +75,9 @@ bank balance snapshot and retains the original event payload for auditing.
 `ingest_batch` commits each page's mapped transactions, pending outbox messages,
 parked events, and bank cursor as one transaction. Duplicate transaction IDs
 are ignored, and only booked EUR credits are accepted for mapped accounts.
+At application startup, Forge initializes its integration tables and starts a
+background poller. It resumes the saved cursor, drains pages, waits 30 seconds
+between successful polls, and backs off up to 60 seconds after failures.
 
 ## Docker setup
 
