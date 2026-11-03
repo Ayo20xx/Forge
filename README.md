@@ -78,6 +78,9 @@ are ignored, and only booked EUR credits are accepted for mapped accounts.
 At application startup, Forge initializes its integration tables and starts a
 background poller. It resumes the saved cursor, drains pages, waits 30 seconds
 between successful polls, and backs off up to 60 seconds after failures.
+The outbox publisher also starts at application startup. It sends due pending
+events through `LoggingSender`, marks successful deliveries as sent, and
+retries delivery errors with capped exponential delays.
 
 ## Docker setup
 

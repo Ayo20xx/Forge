@@ -50,6 +50,7 @@ class FakeBankClient:
 @pytest.fixture
 def api_context(monkeypatch):
     monkeypatch.setattr("app.main.run_poller", lambda *args: None)
+    monkeypatch.setattr("app.main.run_outbox_publisher", lambda *args: None)
     monkeypatch.setattr("app.main.create_tables", lambda engine: None)
     engine = create_engine(
         "sqlite://",
