@@ -10,7 +10,7 @@ from app.models import Base, PollCursor
 from app.repository import Repository
 from app.schemas import TransactionPage
 from app.services.bank_client import BankError
-from app.services.poller import run_poller
+from app.services.poller import TransactionSource, run_poller
 
 BANK_ID = "polling-bank"
 
@@ -46,7 +46,7 @@ class StopAfterWait:
         return self.stopped
 
 
-class FakeBank:
+class FakeBank(TransactionSource):
     def __init__(self, pages: list[dict[str, object]]) -> None:
         self.pages = pages
         self.after_values: list[int] = []
@@ -102,7 +102,7 @@ def test_poller_resumes_from_cursor_and_drains_all_pages(
 def test_poller_retries_bank_errors_with_exponential_backoff(
     session_factory: sessionmaker[Session],
 ):
-    class FailingOnceBank:
+    class FailingOnceBank(TransactionSource):
         after_values: list[int] = []
 
         def get_transactions(self, *, after: int) -> TransactionPage:
@@ -124,7 +124,7 @@ def test_poller_retries_bank_errors_with_exponential_backoff(
 def test_poller_caps_retry_backoff_at_sixty_seconds(
     session_factory: sessionmaker[Session],
 ):
-    class AlwaysFailingBank:
+    class AlwaysFailingBank(TransactionSource):
         def get_transactions(self, *, after: int) -> TransactionPage:
             raise BankError("bank unavailable")
 
@@ -148,7 +148,7 @@ def test_poller_retries_invalid_pages_without_advancing_cursor(
 ):
     save_cursor(session_factory, 0)
 
-    class InvalidThenValidBank:
+    class InvalidThenValidBank(TransactionSource):
         calls = 0
 
         def get_transactions(self, *, after: int) -> TransactionPage:
