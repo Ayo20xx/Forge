@@ -14,10 +14,10 @@ the ledger business logic.
                                     | HTTP / X-API-Key
                                     v
 +-------------------+     +--------+---------+     +----------------------+
-| API / future logic| --> | SQLAlchemy layer | --> | PostgreSQL 16        |
-| app/routers       |     | models + sessions|     | users, accounts,     |
-| app/ingest.py     |     +------------------+     | ledger, cursors      |
-| app/poller.py     |                               +----------------------+
+| API / services    | --> | Repository       | --> | PostgreSQL 16        |
+| app/routers       |     | SQLAlchemy models|     | accounts, events,   |
+| app/services     |     +------------------+     | cursors, outbox     |
++-------------------+                               +----------------------+
 +-------------------+
 ```
 
