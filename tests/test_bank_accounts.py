@@ -7,10 +7,10 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db import get_repository
+from app.db import get_bank_account_repository
 from app.main import app
 from app.models import BankAccount, BankTransaction, Base
-from app.repository import Repository
+from app.repository.bank_accounts import BankAccountRepository
 from app.services.bank_client import BankError, PollingBankClient, get_bank_client
 
 
@@ -71,9 +71,9 @@ def api_context(monkeypatch):
     Base.metadata.create_all(engine)
     test_session_factory = sessionmaker(bind=engine, expire_on_commit=False)
     session = test_session_factory()
-    repository = Repository(test_session_factory)
+    repository = BankAccountRepository(test_session_factory)
     bank_client = FakeBankClient()
-    app.dependency_overrides[get_repository] = lambda: repository
+    app.dependency_overrides[get_bank_account_repository] = lambda: repository
     app.dependency_overrides[get_bank_client] = lambda: bank_client
 
     try:

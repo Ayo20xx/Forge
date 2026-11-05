@@ -6,8 +6,9 @@ from typing import Protocol
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.repository import Repository
-from app.schemas import TransactionPage
+from app.repository.ingest import IngestionRepository
+from app.repository.polling import PollingRepository
+from app.schemas.transactions import TransactionPage
 from app.services.bank_client import BankError
 from app.services.ingest import ingest_batch
 
@@ -38,7 +39,8 @@ def _validate_page(
 
 def run_poller(
     bank_client: TransactionSource,
-    repository: Repository,
+    polling_repository: PollingRepository,
+    ingestion_repository: IngestionRepository,
     interval_seconds: int = 30,
     stop_event: StopSignal | None = None,
 ) -> None:
@@ -50,12 +52,12 @@ def run_poller(
 
     while not stop.is_set():
         try:
-            expected_bank_id, cursor = repository.latest_cursor()
+            expected_bank_id, cursor = polling_repository.latest_cursor()
             while not stop.is_set():
                 page = bank_client.get_transactions(after=cursor)
                 _validate_page(page, cursor, expected_bank_id)
                 ingest_batch(
-                    repository,
+                    ingestion_repository,
                     page.data,
                     page.next_cursor,
                     bank_id=page.bank_id,

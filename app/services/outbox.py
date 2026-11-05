@@ -7,7 +7,7 @@ from typing import Protocol
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.repository import Repository
+from app.repository.outbox import OutboxRepository
 
 logger = logging.getLogger(__name__)
 MAX_BATCH_SIZE = 100
@@ -34,7 +34,7 @@ class LoggingSender:
 
 
 def publish_pending(
-    repository: Repository,
+    repository: OutboxRepository,
     sender: EventSender,
     *,
     now: datetime | None = None,
@@ -52,7 +52,7 @@ def publish_pending(
 
 
 def run_outbox_publisher(
-    repository: Repository,
+    repository: OutboxRepository,
     sender: EventSender,
     stop_event: Event | None = None,
 ) -> None:

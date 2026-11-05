@@ -2,9 +2,9 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.db import get_repository
-from app.repository import BankAccountConflict, Repository
-from app.schemas import (
+from app.db import get_bank_account_repository
+from app.repository.bank_accounts import BankAccountConflict, BankAccountRepository
+from app.schemas.bank_accounts import (
     BankAccountCreate,
     BankAccountData,
     BankAccountResponse,
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/bank-accounts", tags=["bank accounts"])
 @router.post("", response_model=BankAccountResponse, status_code=201)
 def post_bank_account(
     body: BankAccountCreate,
-    repository: Repository = Depends(get_repository),
+    repository: BankAccountRepository = Depends(get_bank_account_repository),
     bank_client: PollingBankClient = Depends(get_bank_client),
 ) -> BankAccountResponse:
     """Create the receiving account at the bank, then store its local mapping."""
@@ -38,7 +38,7 @@ def post_bank_account(
 @router.get("/{account_id}/reconciliation", response_model=ReconciliationResponse)
 def reconcile_bank_account(
     account_id: str,
-    repository: Repository = Depends(get_repository),
+    repository: BankAccountRepository = Depends(get_bank_account_repository),
     bank_client: PollingBankClient = Depends(get_bank_client),
 ) -> ReconciliationResponse:
     """Compare stored transaction total with the bank's current booked balance."""

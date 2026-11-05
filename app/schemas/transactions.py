@@ -1,32 +1,10 @@
-"""Pydantic models for API requests and bank integration payloads."""
+"""Schemas for bank transaction pages and normalized transfers."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-
-class BankAccountCreate(BaseModel):
-    customer_reference: str = Field(
-        min_length=1,
-        max_length=64,
-        pattern=r"^[A-Za-z0-9_-]+$",
-    )
-
-
-class BankAccountData(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
-    bank_id: str = Field(min_length=1, max_length=64)
-    account_id: str = Field(min_length=1, max_length=128)
-    customer_reference: str = Field(min_length=1, max_length=128)
-    iban: str = Field(min_length=1, max_length=64)
-    currency: str = Field(min_length=3, max_length=3)
-    booked_balance_minor: int = Field(strict=True)
-    available_balance_minor: int = Field(strict=True)
-    account_version: int = Field(ge=0, strict=True)
-    sandbox: bool = Field(strict=True)
 
 
 class BankTransferEvent(BaseModel):
@@ -67,7 +45,7 @@ class TransactionPage(BaseModel):
 
 
 class Transfer(BaseModel):
-    """Normalized bank transfer used by ingestion and the repository."""
+    """Normalized bank transfer used by ingestion and persistence."""
 
     bank_id: str
     account_id: str
@@ -107,26 +85,3 @@ class Transfer(BaseModel):
             occurred_at=event.occurred_at,
             raw_payload=event.model_dump(mode="json"),
         )
-
-
-class BankAccountResponse(BaseModel):
-    id: int
-    bank_id: str
-    account_id: str
-    iban: str
-    customer_reference: str
-
-    model_config = {"from_attributes": True}
-
-
-class SyncResponse(BaseModel):
-    imported_count: int
-    accounts: list[BankAccountResponse]
-
-
-class ReconciliationResponse(BaseModel):
-    account_id: str
-    stored_total_minor: int
-    bank_balance_minor: int
-    difference_minor: int
-    matches: bool

@@ -14,7 +14,7 @@ the ledger business logic.
                                     | HTTP / X-API-Key
                                     v
 +-------------------+     +--------+---------+     +----------------------+
-| API / services    | --> | Repository       | --> | PostgreSQL 16        |
+| API / services    | --> | Repositories     | --> | PostgreSQL 16        |
 | app/routers       |     | SQLAlchemy models|     | accounts, events,   |
 | app/services     |     +------------------+     | cursors, outbox     |
 +-------------------+                               +----------------------+
@@ -73,16 +73,18 @@ transaction total with the bank's current booked balance:
 The customer reference is an opaque identifier passed through from the core
 service; Forge does not create or own a customer record.
 
-Polling Bank transaction events are validated and normalized by Pydantic models
-in `app/schemas.py`. The normalized `Transfer` keeps the event amount separate
-from the bank balance snapshot and retains the original event payload for auditing.
+Pydantic models live in `app/schemas/`, grouped by service in
+`bank_accounts.py`, `transactions.py`, and `admin.py`. The normalized `Transfer`
+keeps the event amount separate from the bank balance snapshot and retains the
+original event payload for auditing.
 `ingest_batch` commits each page's mapped transactions, pending outbox messages,
 parked events, and bank cursor as one transaction. Duplicate transaction IDs
 are ignored, and only booked EUR credits are accepted for mapped accounts.
-`app/repository.py` owns database queries and transaction boundaries. At
-application startup, Forge applies Alembic migrations and starts a background
-poller. It resumes the saved cursor, drains pages, waits 30 seconds between
-successful polls, and backs off up to 60 seconds after failures.
+Service-specific modules in `app/repository/` own database queries and
+transaction boundaries. At application startup, Forge applies Alembic
+migrations and starts a background poller. It resumes the saved cursor, drains
+pages, waits 30 seconds between successful polls, and backs off up to 60 seconds
+after failures.
 The outbox publisher also starts at application startup. It sends due pending
 events through `LoggingSender`, marks successful deliveries as sent, and
 retries delivery errors with capped exponential delays.
@@ -129,11 +131,3 @@ migrations are applied by the app at startup and can also be run with
 Requests send `X-API-Key`; the client uses a timeout and raises `BankError` for
 transport failures, non-2xx responses, and malformed JSON. The transaction
 cursor is bank-wide, and pages must be drained while `has_more` is true.
-
-## Next: Webhook Bank
-
-The simulator also documents a Webhook Bank integration. Add it only after the
-Polling Bank ledger path is working: verify webhook signatures against the exact
-raw request bytes, reject stale timestamps, persist before acknowledging, and
-deduplicate events with the same `(bank_id, transaction_id)` key. Never treat a
-webhook balance snapshot as a ledger credit.

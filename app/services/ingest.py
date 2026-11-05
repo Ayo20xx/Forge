@@ -2,12 +2,12 @@
 
 from collections.abc import Mapping, Sequence
 
-from app.repository import Repository
-from app.schemas import BankTransferEvent, Transfer
+from app.repository.ingest import IngestionRepository
+from app.schemas.transactions import BankTransferEvent, Transfer
 
 
 def ingest_batch(
-    repository: Repository,
+    repository: IngestionRepository,
     events: Sequence[BankTransferEvent | Transfer | Mapping[str, object]],
     next_cursor: int,
     bank_id: str | None = None,

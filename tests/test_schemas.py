@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.schemas import BankTransferEvent, Transfer
+from app.schemas.transactions import BankTransferEvent, Transfer
 
 
 @pytest.fixture

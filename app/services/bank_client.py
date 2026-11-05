@@ -9,7 +9,8 @@ from urllib.parse import quote
 import httpx
 
 from app.config import get_settings
-from app.schemas import BankAccountData, TransactionPage
+from app.schemas.bank_accounts import BankAccountData
+from app.schemas.transactions import TransactionPage
 
 
 class BankError(Exception):

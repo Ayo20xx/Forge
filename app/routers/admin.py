@@ -2,9 +2,10 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.db import get_repository
-from app.repository import BankAccountConflict, Repository
-from app.schemas import BankAccountData, BankAccountResponse, SyncResponse
+from app.db import get_bank_account_repository
+from app.repository.bank_accounts import BankAccountConflict, BankAccountRepository
+from app.schemas.admin import SyncResponse
+from app.schemas.bank_accounts import BankAccountData, BankAccountResponse
 from app.services.bank_client import BankError, PollingBankClient, get_bank_client
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.post("/sync", response_model=SyncResponse)
 def sync_accounts(
-    repository: Repository = Depends(get_repository),
+    repository: BankAccountRepository = Depends(get_bank_account_repository),
     bank_client: PollingBankClient = Depends(get_bank_client),
 ) -> SyncResponse:
     """Import existing bank accounts without interpreting their core references."""

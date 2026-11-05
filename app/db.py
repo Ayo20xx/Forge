@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.config import get_database_url
-from app.repository import Repository
+from app.repository.bank_accounts import BankAccountRepository
 
 engine = create_engine(get_database_url(), pool_pre_ping=True)
 SessionLocal = sessionmaker(
@@ -17,5 +17,5 @@ SessionLocal = sessionmaker(
 )
 
 
-def get_repository() -> Generator[Repository, None, None]:
-    yield Repository(SessionLocal)
+def get_bank_account_repository() -> Generator[BankAccountRepository, None, None]:
+    yield BankAccountRepository(SessionLocal)

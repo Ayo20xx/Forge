@@ -14,8 +14,8 @@ from app.models import (
     PollCursor,
     UnmappedTransaction,
 )
-from app.repository import Repository
-from app.schemas import BankTransferEvent, Transfer
+from app.repository.ingest import IngestionRepository
+from app.schemas.transactions import BankTransferEvent, Transfer
 from app.services.ingest import ingest_batch
 
 BANK_ID = "polling-bank"
@@ -41,7 +41,7 @@ def db_session():
 
 @pytest.fixture
 def repository(db_session):
-    return Repository(db_session.info["test_session_factory"])
+    return IngestionRepository(db_session.info["test_session_factory"])
 
 
 def event_data(**overrides: object) -> dict[str, object]:

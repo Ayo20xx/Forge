@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.models import Base, PollCursor
-from app.repository import Repository
-from app.schemas import TransactionPage
+from app.repository.ingest import IngestionRepository
+from app.repository.polling import PollingRepository
+from app.schemas.transactions import TransactionPage
 from app.services.bank_client import BankError
 from app.services.poller import TransactionSource, run_poller
 
@@ -92,7 +93,13 @@ def test_poller_resumes_from_cursor_and_drains_all_pages(
     bank = FakeBank([page(9, has_more=True), page(12, has_more=False)])
     stop = StopAfterWait(1)
 
-    run_poller(bank, Repository(session_factory), interval_seconds=30, stop_event=stop)
+    run_poller(
+        bank,
+        PollingRepository(session_factory),
+        IngestionRepository(session_factory),
+        interval_seconds=30,
+        stop_event=stop,
+    )
 
     assert bank.after_values == [5, 9]
     assert read_cursor(session_factory) == 12
@@ -114,7 +121,13 @@ def test_poller_retries_bank_errors_with_exponential_backoff(
     bank = FailingOnceBank()
     stop = StopAfterWait(2)
 
-    run_poller(bank, Repository(session_factory), interval_seconds=30, stop_event=stop)
+    run_poller(
+        bank,
+        PollingRepository(session_factory),
+        IngestionRepository(session_factory),
+        interval_seconds=30,
+        stop_event=stop,
+    )
 
     assert bank.after_values == [0, 0]
     assert stop.waits == [1, 30]
@@ -129,7 +142,12 @@ def test_poller_caps_retry_backoff_at_sixty_seconds(
             raise BankError("bank unavailable")
 
     stop = StopAfterWait(8)
-    run_poller(AlwaysFailingBank(), Repository(session_factory), stop_event=stop)
+    run_poller(
+        AlwaysFailingBank(),
+        PollingRepository(session_factory),
+        IngestionRepository(session_factory),
+        stop_event=stop,
+    )
 
     assert stop.waits == [1, 2, 4, 8, 16, 32, 60, 60]
 
@@ -158,7 +176,12 @@ def test_poller_retries_invalid_pages_without_advancing_cursor(
     bank = InvalidThenValidBank()
     stop = StopAfterWait(2)
 
-    run_poller(bank, Repository(session_factory), stop_event=stop)
+    run_poller(
+        bank,
+        PollingRepository(session_factory),
+        IngestionRepository(session_factory),
+        stop_event=stop,
+    )
 
     assert read_cursor(session_factory) == 3
     assert stop.waits == [1, 30]
@@ -170,7 +193,8 @@ def test_poller_rejects_non_positive_interval(
     with pytest.raises(ValueError, match="interval_seconds must be positive"):
         run_poller(
             FakeBank([]),
-            Repository(session_factory),
+            PollingRepository(session_factory),
+            IngestionRepository(session_factory),
             interval_seconds=0,
             stop_event=Event(),
         )
