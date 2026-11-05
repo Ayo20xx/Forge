@@ -5,9 +5,10 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db import get_session
+from app.db import get_repository
 from app.main import app
-from app.models import BankAccount
+from app.models import BankAccount, Base
+from app.repository import Repository
 from app.services.bank_client import BankError, PollingBankClient, get_bank_client
 
 
@@ -51,17 +52,18 @@ class FakeBankClient:
 def api_context(monkeypatch):
     monkeypatch.setattr("app.main.run_poller", lambda *args: None)
     monkeypatch.setattr("app.main.run_outbox_publisher", lambda *args: None)
-    monkeypatch.setattr("app.main.create_tables", lambda engine: None)
+    monkeypatch.setattr("app.main.upgrade_database", lambda: None)
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    BankAccount.__table__.create(engine)
+    Base.metadata.create_all(engine)
     test_session_factory = sessionmaker(bind=engine, expire_on_commit=False)
     session = test_session_factory()
+    repository = Repository(test_session_factory)
     bank_client = FakeBankClient()
-    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[get_repository] = lambda: repository
     app.dependency_overrides[get_bank_client] = lambda: bank_client
 
     try:

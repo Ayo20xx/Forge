@@ -1,21 +1,14 @@
-# Creates the SQLAlchemy engine and session factory for connecting to Postgres.
+"""SQLAlchemy engine, session factory, and repository dependency."""
 
-import os
 from collections.abc import Generator
 
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
-load_dotenv()
+from app.config import get_database_url
+from app.repository import Repository
 
-DEFAULT_DATABASE_URL = "postgresql+psycopg://forge:forge@localhost:5432/forge"
-
-engine = create_engine(
-    os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL),
-    pool_pre_ping=True,
-)
-
+engine = create_engine(get_database_url(), pool_pre_ping=True)
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
@@ -24,9 +17,5 @@ SessionLocal = sessionmaker(
 )
 
 
-def get_session() -> Generator[Session, None, None]:
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
+def get_repository() -> Generator[Repository, None, None]:
+    yield Repository(SessionLocal)

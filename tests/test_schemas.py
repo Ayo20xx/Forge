@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.services.adapter import PollingAdapter, Transfer
+from app.schemas import BankTransferEvent, Transfer
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def bank_event() -> dict[str, object]:
 
 
 def test_polling_adapter_normalizes_bank_event(bank_event):
-    transfer = PollingAdapter().adapt(bank_event)
+    transfer = Transfer.from_bank_event(BankTransferEvent.model_validate(bank_event))
 
     assert transfer == Transfer(
         bank_id="polling-bank",
@@ -73,4 +73,4 @@ def test_polling_adapter_rejects_invalid_event_fields(bank_event, field, value):
     bank_event[field] = value
 
     with pytest.raises(ValueError):
-        PollingAdapter().adapt(bank_event)
+        Transfer.from_bank_event(BankTransferEvent.model_validate(bank_event))
