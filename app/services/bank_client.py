@@ -3,50 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import TypedDict, cast
+from typing import cast
 from urllib.parse import quote
 
 import httpx
 
 from app.config import get_settings
-
-
-class BankAccount(TypedDict):
-    bank_id: str
-    account_id: str
-    customer_reference: str
-    iban: str
-    currency: str
-    booked_balance_minor: int
-    available_balance_minor: int
-    account_version: int
-    sandbox: bool
-
-
-class BankTransfer(TypedDict):
-    bank_id: str
-    account_id: str
-    customer_reference: str
-    iban: str
-    currency: str
-    booked_balance_minor: int
-    available_balance_minor: int
-    sandbox: bool
-    id: str
-    transaction_id: str
-    type: str
-    status: str
-    amount_minor: int
-    account_version: int
-    sequence: int
-    occurred_at: str
-
-
-class TransactionPage(TypedDict):
-    bank_id: str
-    data: list[BankTransfer]
-    next_cursor: int
-    has_more: bool
+from app.schemas.bank_accounts import BankAccountData
+from app.schemas.transactions import TransactionPage
 
 
 class BankError(Exception):
@@ -98,46 +62,54 @@ class PollingBankClient:
             raise BankError("Polling Bank returned an unexpected response shape")
         return cast(dict[str, object], payload)
 
-    def list_accounts(self) -> list[BankAccount]:
+    def list_accounts(self) -> list[BankAccountData]:
         """Return all receiving accounts from GET /polling-bank/accounts."""
         payload = self._request_json("GET", "/polling-bank/accounts")
         accounts = payload.get("data")
         if not isinstance(accounts, list):
             raise BankError("Polling Bank returned an invalid accounts response")
-        return cast(list[BankAccount], accounts)
+        try:
+            return [BankAccountData.model_validate(account) for account in accounts]
+        except ValueError as exc:
+            raise BankError("Polling Bank returned invalid account data") from exc
 
-    def create_account(self, customer_reference: str) -> BankAccount:
+    def create_account(self, customer_reference: str) -> BankAccountData:
         """Create or retrieve the idempotent account for a customer reference."""
         payload = self._request_json(
             "POST",
             "/polling-bank/accounts",
             json={"customer_reference": customer_reference},
         )
-        for field in ("bank_id", "account_id", "customer_reference", "iban"):
-            value = payload.get(field)
-            if not isinstance(value, str) or not value:
-                raise BankError("Polling Bank returned an invalid account response")
-        if payload["customer_reference"] != customer_reference:
+        try:
+            account = BankAccountData.model_validate(payload)
+        except ValueError as exc:
+            raise BankError("Polling Bank returned an invalid account response") from exc
+        if account.customer_reference != customer_reference:
             raise BankError("Polling Bank returned an account for a different customer")
-        return cast(BankAccount, payload)
+        return account
 
-    def get_balance(self, account_id: str) -> BankAccount:
+    def get_balance(self, account_id: str) -> BankAccountData:
         """Return the account snapshot from its balance endpoint."""
         path = f"/polling-bank/accounts/{quote(account_id, safe='')}/balance"
-        return cast(BankAccount, self._request_json("GET", path))
+        try:
+            return BankAccountData.model_validate(self._request_json("GET", path))
+        except ValueError as exc:
+            raise BankError("Polling Bank returned invalid balance data") from exc
 
     def get_transactions(self, after: int = 0) -> TransactionPage:
         """Return one bank-wide transaction page after the supplied sequence cursor."""
         if after < 0:
             raise ValueError("after cursor must be non-negative")
-        return cast(
-            TransactionPage,
-            self._request_json(
-                "GET",
-                "/polling-bank/transactions",
-                params={"after": after},
-            ),
-        )
+        try:
+            return TransactionPage.model_validate(
+                self._request_json(
+                    "GET",
+                    "/polling-bank/transactions",
+                    params={"after": after},
+                )
+            )
+        except ValueError as exc:
+            raise BankError("Polling Bank returned an invalid transaction page") from exc
 
     def close(self) -> None:
         """Close the underlying HTTP connection pool."""
