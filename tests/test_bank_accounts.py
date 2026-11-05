@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -7,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import get_repository
 from app.main import app
-from app.models import BankAccount, Base
+from app.models import BankAccount, BankTransaction, Base
 from app.repository import Repository
 from app.services.bank_client import BankError, PollingBankClient, get_bank_client
 
@@ -45,6 +47,14 @@ class FakeBankClient:
         self.created_references.append(customer_reference)
         if self.error is not None:
             raise self.error
+        return self.account
+
+    def list_accounts(self) -> list[dict[str, object]]:
+        return [self.account]
+
+    def get_balance(self, account_id: str) -> dict[str, object]:
+        if self.account["account_id"] != account_id:
+            raise BankError("unknown account")
         return self.account
 
 
@@ -143,6 +153,54 @@ def test_post_bank_account_is_idempotent_for_same_bank_mapping(api_context):
     assert second.status_code == 201
     assert first.json()["id"] == second.json()["id"]
     assert session.scalar(select(func.count()).select_from(BankAccount)) == 1
+
+
+def test_admin_sync_imports_bank_accounts(api_context):
+    client, session, _ = api_context
+
+    response = client.post("/admin/sync")
+
+    assert response.status_code == 200
+    assert response.json()["imported_count"] == 1
+    assert response.json()["accounts"][0]["account_id"] == "account-1"
+    assert session.scalar(select(func.count()).select_from(BankAccount)) == 1
+
+
+def test_reconciliation_compares_sum_of_deposits_with_bank_balance(api_context):
+    client, session, bank_client = api_context
+    account = BankAccount(
+        bank_id="polling-bank",
+        account_id="account-1",
+        iban="DE89370400440532013000",
+        customer_reference="customer-1",
+    )
+    session.add(account)
+    session.flush()
+    session.add(
+        BankTransaction(
+            bank_account_id=account.id,
+            bank_id=account.bank_id,
+            account_id=account.account_id,
+            transaction_id="transaction-1",
+            customer_reference=account.customer_reference,
+            amount_minor=1250,
+            currency="EUR",
+            booked_balance_minor=1250,
+            account_version=1,
+            sequence=1,
+            occurred_at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC),
+            raw_payload={"amount_minor": 1250},
+        )
+    )
+    session.commit()
+    bank_client.account["booked_balance_minor"] = 1250
+
+    response = client.get("/bank-accounts/account-1/reconciliation")
+
+    assert response.status_code == 200
+    assert response.json()["stored_total_minor"] == 1250
+    assert response.json()["bank_balance_minor"] == 1250
+    assert response.json()["matches"] is True
 
 
 @pytest.mark.parametrize(

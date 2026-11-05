@@ -1,8 +1,9 @@
+from collections.abc import Generator
 from threading import Event
 
 import pytest
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.models import Base, PollCursor
@@ -15,7 +16,7 @@ BANK_ID = "polling-bank"
 
 
 @pytest.fixture
-def session_factory():
+def session_factory() -> Generator[sessionmaker[Session], None, None]:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -84,7 +85,9 @@ def read_cursor(session_factory) -> int:
         return session.scalar(select(PollCursor.cursor).where(PollCursor.bank_id == BANK_ID))
 
 
-def test_poller_resumes_from_cursor_and_drains_all_pages(session_factory):
+def test_poller_resumes_from_cursor_and_drains_all_pages(
+    session_factory: sessionmaker[Session],
+):
     save_cursor(session_factory, 5)
     bank = FakeBank([page(9, has_more=True), page(12, has_more=False)])
     stop = StopAfterWait(1)
@@ -96,7 +99,9 @@ def test_poller_resumes_from_cursor_and_drains_all_pages(session_factory):
     assert stop.waits == [30]
 
 
-def test_poller_retries_bank_errors_with_exponential_backoff(session_factory):
+def test_poller_retries_bank_errors_with_exponential_backoff(
+    session_factory: sessionmaker[Session],
+):
     class FailingOnceBank:
         after_values: list[int] = []
 
@@ -116,7 +121,9 @@ def test_poller_retries_bank_errors_with_exponential_backoff(session_factory):
     assert read_cursor(session_factory) == 4
 
 
-def test_poller_caps_retry_backoff_at_sixty_seconds(session_factory):
+def test_poller_caps_retry_backoff_at_sixty_seconds(
+    session_factory: sessionmaker[Session],
+):
     class AlwaysFailingBank:
         def get_transactions(self, *, after: int) -> TransactionPage:
             raise BankError("bank unavailable")
@@ -136,7 +143,9 @@ def test_poller_caps_retry_backoff_at_sixty_seconds(session_factory):
         {"bank_id": "different-bank", "data": [], "next_cursor": 1, "has_more": False},
     ],
 )
-def test_poller_retries_invalid_pages_without_advancing_cursor(session_factory, invalid_page):
+def test_poller_retries_invalid_pages_without_advancing_cursor(
+    session_factory: sessionmaker[Session], invalid_page: dict[str, object]
+):
     save_cursor(session_factory, 0)
 
     class InvalidThenValidBank:
@@ -155,7 +164,9 @@ def test_poller_retries_invalid_pages_without_advancing_cursor(session_factory, 
     assert stop.waits == [1, 30]
 
 
-def test_poller_rejects_non_positive_interval(session_factory):
+def test_poller_rejects_non_positive_interval(
+    session_factory: sessionmaker[Session],
+):
     with pytest.raises(ValueError, match="interval_seconds must be positive"):
         run_poller(
             FakeBank([]),
