@@ -19,6 +19,12 @@ class TransactionSource(Protocol):
     def get_transactions(self, *, after: int) -> TransactionPage: ...
 
 
+class StopSignal(Protocol):
+    def is_set(self) -> bool: ...
+
+    def wait(self, timeout: float) -> bool: ...
+
+
 def _validate_page(
     page: TransactionPage, after: int, expected_bank_id: str | None
 ) -> None:
@@ -34,7 +40,7 @@ def run_poller(
     bank_client: TransactionSource,
     repository: Repository,
     interval_seconds: int = 30,
-    stop_event: Event | None = None,
+    stop_event: StopSignal | None = None,
 ) -> None:
     """Poll every interval, draining pages and backing off after recoverable errors."""
     if interval_seconds <= 0:
