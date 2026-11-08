@@ -4,23 +4,6 @@ Forge is a sandbox project for a Wise-style, multi-customer euro ledger. It
 connects local customer records to simulated receiving accounts at the Polling
 Bank and prepares the database, HTTP client, and test harness for implementing
 the ledger business logic.
-
-## Architecture
-
-```text
-                         +----------------------+
-                         | Polling Bank sandbox |
-                         +----------+-----------+
-                                    | HTTP / X-API-Key
-                                    v
-+-------------------+     +--------+---------+     +----------------------+
-| API / services    | --> | Repositories     | --> | PostgreSQL 16        |
-| app/routers       |     | SQLAlchemy models|     | accounts, events,   |
-| app/services     |     +------------------+     | cursors, outbox     |
-+-------------------+                               +----------------------+
-+-------------------+
-```
-
 ## Domain rules
 
 - Money is an integer number of EUR cents (`amount_minor`); never use floats.
@@ -80,11 +63,15 @@ original event payload for auditing.
 `ingest_batch` commits each page's mapped transactions, pending outbox messages,
 parked events, and bank cursor as one transaction. Duplicate transaction IDs
 are ignored, and only booked EUR credits are accepted for mapped accounts.
-Service-specific modules in `app/repository/` own database queries and
-transaction boundaries. At application startup, Forge applies Alembic
-migrations and starts a background poller. It resumes the saved cursor, drains
-pages, waits 30 seconds between successful polls, and backs off up to 60 seconds
-after failures.
+Routers in `app/routers/` delegate request handling to `BankAccountService` in
+`app/services/workflows.py`; that service coordinates bank-client calls,
+repository operations, and HTTP error mapping. The same workflows module
+contains transaction ingestion, polling, and outbox publishing. The repository
+modules own database queries and transaction boundaries, while
+`app/services/bank_client.py` owns Polling Bank HTTP communication. At
+application startup, Forge applies Alembic migrations and starts a background
+poller. It resumes the saved cursor, drains pages, waits 30 seconds between
+successful polls, and backs off up to 60 seconds after failures.
 The outbox publisher also starts at application startup. It sends due pending
 events through `LoggingSender`, marks successful deliveries as sent, and
 retries delivery errors with capped exponential delays.

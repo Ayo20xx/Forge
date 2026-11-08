@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.models import BankAccount, BankTransaction, Base, OutboxEvent
 from app.repository.outbox import OutboxRepository
-from app.services.outbox import LoggingSender, SenderError, publish_pending
+from app.services.workflows import LoggingSender, SenderError, publish_pending
 
 NOW = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 

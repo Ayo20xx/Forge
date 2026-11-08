@@ -16,7 +16,7 @@ from app.models import (
 )
 from app.repository.ingest import IngestionRepository
 from app.schemas.transactions import BankTransferEvent, Transfer
-from app.services.ingest import ingest_batch
+from app.services.workflows import ingest_batch
 
 BANK_ID = "polling-bank"
 

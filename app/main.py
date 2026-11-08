@@ -14,8 +14,7 @@ from app.repository.outbox import OutboxRepository
 from app.repository.polling import PollingRepository
 from app.routers import admin, bank_accounts
 from app.services.bank_client import PollingBankClient
-from app.services.outbox import LoggingSender, run_outbox_publisher
-from app.services.poller import run_poller
+from app.services.workflows import LoggingSender, run_outbox_publisher, run_poller
 
 
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
