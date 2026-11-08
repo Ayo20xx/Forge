@@ -15,7 +15,6 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -143,8 +142,3 @@ class OutboxEvent(Base):
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-
-
-def create_tables(engine: Engine) -> None:
-    """Create the integration-layer tables on the supplied SQLAlchemy engine."""
-    Base.metadata.create_all(bind=engine)

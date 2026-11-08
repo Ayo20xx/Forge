@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       POLLING_API_KEY: test-key
+      BANK_BASE_URL: https://bank.example
       DATABASE_URL: postgresql+psycopg://forge:forge@localhost:5432/forge
     steps:
       - uses: actions/checkout@v4
