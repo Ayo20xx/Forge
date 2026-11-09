@@ -14,7 +14,8 @@ from app.repository.outbox import OutboxRepository
 from app.repository.polling import PollingRepository
 from app.routers import admin, bank_accounts
 from app.services.bank_client import PollingBankClient
-from app.services.workflows import LoggingSender, run_outbox_publisher, run_poller
+from app.services.outbox_publisher import LoggingSender, OutboxPublisher
+from app.services.transaction_ingestion import TransactionIngestionService
 
 
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -25,21 +26,20 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     polling_repository = PollingRepository(SessionLocal)
     ingestion_repository = IngestionRepository(SessionLocal)
     outbox_repository = OutboxRepository(SessionLocal)
+    ingestion_service = TransactionIngestionService(
+        ingestion_repository=ingestion_repository,
+        polling_repository=polling_repository,
+    )
+    outbox_publisher_service = OutboxPublisher(outbox_repository, logging_sender)
     poller = Thread(
-        target=run_poller,
-        args=(
-            bank_client,
-            polling_repository,
-            ingestion_repository,
-            get_settings().poll_interval_seconds,
-            stop_event,
-        ),
+        target=ingestion_service.run,
+        args=(bank_client, get_settings().poll_interval_seconds, stop_event),
         name="forge-polling-bank",
         daemon=True,
     )
     outbox_publisher = Thread(
-        target=run_outbox_publisher,
-        args=(outbox_repository, logging_sender, stop_event),
+        target=outbox_publisher_service.run,
+        args=(stop_event,),
         name="forge-outbox-publisher",
         daemon=True,
     )

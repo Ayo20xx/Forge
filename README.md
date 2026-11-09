@@ -63,10 +63,12 @@ original event payload for auditing.
 `ingest_batch` commits each page's mapped transactions, pending outbox messages,
 parked events, and bank cursor as one transaction. Duplicate transaction IDs
 are ignored, and only booked EUR credits are accepted for mapped accounts.
-Routers in `app/routers/` delegate request handling to `BankAccountService` in
-`app/services/workflows.py`; that service coordinates bank-client calls,
-repository operations, and HTTP error mapping. The same workflows module
-contains transaction ingestion, polling, and outbox publishing. The repository
+Routers in `app/routers/` delegate account routes to `BankAccountService` in
+`app/services/bank_accounts.py`, which coordinates bank-client calls,
+repository operations, and HTTP error mapping. `TransactionIngestionService`
+in `app/services/transaction_ingestion.py` normalizes imported transaction
+pages and polls the bank, while `OutboxPublisher` in
+`app/services/outbox_publisher.py` publishes pending events. The repository
 modules own database queries and transaction boundaries, while
 `app/services/bank_client.py` owns Polling Bank HTTP communication. At
 application startup, Forge applies Alembic migrations and starts a background

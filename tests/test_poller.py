@@ -11,7 +11,7 @@ from app.repository.ingest import IngestionRepository
 from app.repository.polling import PollingRepository
 from app.schemas.transactions import TransactionPage
 from app.services.bank_client import BankError
-from app.services.workflows import TransactionSource, run_poller
+from app.services.transaction_ingestion import TransactionSource, run_poller
 
 BANK_ID = "polling-bank"
 

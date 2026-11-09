@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from app.schemas.admin import SyncResponse
-from app.services.workflows import BankAccountService, get_bank_account_service
+from app.services.bank_accounts import BankAccountService, get_bank_account_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

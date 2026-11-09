@@ -7,7 +7,7 @@ from app.schemas.bank_accounts import (
     BankAccountResponse,
     ReconciliationResponse,
 )
-from app.services.workflows import BankAccountService, get_bank_account_service
+from app.services.bank_accounts import BankAccountService, get_bank_account_service
 
 router = APIRouter(prefix="/bank-accounts", tags=["bank accounts"])
 
