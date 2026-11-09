@@ -1,11 +1,22 @@
 """Bank account business operations."""
 
 from dataclasses import dataclass
+from typing import Protocol
 
 from app.models import BankAccount
 from app.repository.bank_accounts import BankAccountConflict, BankAccountRepository
 from app.schemas.bank_accounts import BankAccountData
-from app.services.bank_client import BankError, PollingBankClient
+from app.services.bank_client import BankError
+
+
+class BankGateway(Protocol):
+    """Bank operations required by the bank-account service."""
+
+    def create_account(self, customer_reference: str) -> BankAccountData: ...
+
+    def list_accounts(self) -> list[BankAccountData]: ...
+
+    def get_balance(self, account_id: str) -> BankAccountData: ...
 
 
 class BankAccountNotFound(Exception):
@@ -44,14 +55,12 @@ class BankAccountService:
     """Orchestrates business operations for bank accounts."""
 
     repository: BankAccountRepository
-    bank_client: PollingBankClient
+    bank_client: BankGateway
 
     def create_bank_account(self, customer_reference: str) -> BankAccount:
         """Create an account at the bank and store its local mapping."""
         try:
-            account = BankAccountData.model_validate(
-                self.bank_client.create_account(customer_reference)
-            )
+            account = self.bank_client.create_account(customer_reference)
             saved = self.repository.create_bank_account(account)
         except BankError as exc:
             raise BankUnavailable("Bank account creation failed") from exc
@@ -63,10 +72,7 @@ class BankAccountService:
     def sync_accounts(self) -> list[BankAccount]:
         """Import existing bank accounts without interpreting their core references."""
         try:
-            accounts = [
-                BankAccountData.model_validate(account)
-                for account in self.bank_client.list_accounts()
-            ]
+            accounts = self.bank_client.list_accounts()
             imported = self.repository.sync_bank_accounts(accounts)
         except BankError as exc:
             raise BankUnavailable("Bank account sync failed") from exc
@@ -85,9 +91,7 @@ class BankAccountService:
         bank_account = bank_accounts[0]
 
         try:
-            bank_snapshot = BankAccountData.model_validate(
-                self.bank_client.get_balance(bank_account.account_id)
-            )
+            bank_snapshot = self.bank_client.get_balance(bank_account.account_id)
         except BankError as exc:
             raise BankUnavailable("Bank balance request failed") from exc
 
