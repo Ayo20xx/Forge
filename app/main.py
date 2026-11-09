@@ -1,4 +1,4 @@
-"""Build the Forge FastAPI app and manage its background Polling Bank worker."""
+"""Build the Forge FastAPI app and start its background workers."""
 
 import asyncio
 from collections.abc import AsyncIterator
@@ -16,6 +16,8 @@ from app.routers import admin, bank_accounts
 from app.services.bank_client import PollingBankClient
 from app.services.outbox_publisher import LoggingSender, OutboxPublisher
 from app.services.transaction_ingestion import TransactionIngestionService
+from app.workers.outbox_publisher import run_outbox_publisher
+from app.workers.poller import run_poller
 
 
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -32,27 +34,32 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     )
     outbox_publisher_service = OutboxPublisher(outbox_repository, logging_sender)
     poller = Thread(
-        target=ingestion_service.run,
-        args=(bank_client, get_settings().poll_interval_seconds, stop_event),
+        target=run_poller,
+        args=(
+            ingestion_service,
+            bank_client,
+            get_settings().poll_interval_seconds,
+            stop_event,
+        ),
         name="forge-polling-bank",
         daemon=True,
     )
-    outbox_publisher = Thread(
-        target=outbox_publisher_service.run,
-        args=(stop_event,),
+    outbox_worker = Thread(
+        target=run_outbox_publisher,
+        args=(outbox_publisher_service, stop_event),
         name="forge-outbox-publisher",
         daemon=True,
     )
     try:
         poller.start()
-        outbox_publisher.start()
+        outbox_worker.start()
         yield
     finally:
         stop_event.set()
         if poller.ident is not None:
             await asyncio.to_thread(poller.join)
-        if outbox_publisher.ident is not None:
-            await asyncio.to_thread(outbox_publisher.join)
+        if outbox_worker.ident is not None:
+            await asyncio.to_thread(outbox_worker.join)
         bank_client.close()
 
 

@@ -60,8 +60,8 @@ class FakeBankClient:
 
 @pytest.fixture
 def api_context(monkeypatch):
-    monkeypatch.setattr("app.main.TransactionIngestionService.run", lambda *args: None)
-    monkeypatch.setattr("app.main.OutboxPublisher.run", lambda *args: None)
+    monkeypatch.setattr("app.main.run_poller", lambda *args: None)
+    monkeypatch.setattr("app.main.run_outbox_publisher", lambda *args: None)
     monkeypatch.setattr("app.main.upgrade_database", lambda: None)
     engine = create_engine(
         "sqlite://",

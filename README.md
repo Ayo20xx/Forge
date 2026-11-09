@@ -67,16 +67,17 @@ Routers in `app/routers/` delegate account routes to `BankAccountService` in
 `app/services/bank_accounts.py`, which coordinates bank-client calls,
 repository operations, and HTTP error mapping. `TransactionIngestionService`
 in `app/services/transaction_ingestion.py` normalizes imported transaction
-pages and polls the bank, while `OutboxPublisher` in
+pages and performs one polling round, while `OutboxPublisher` in
 `app/services/outbox_publisher.py` publishes pending events. The repository
 modules own database queries and transaction boundaries, while
 `app/services/bank_client.py` owns Polling Bank HTTP communication. At
-application startup, Forge applies Alembic migrations and starts a background
-poller. It resumes the saved cursor, drains pages, waits 30 seconds between
-successful polls, and backs off up to 60 seconds after failures.
-The outbox publisher also starts at application startup. It sends due pending
-events through `LoggingSender`, marks successful deliveries as sent, and
-retries delivery errors with capped exponential delays.
+application startup, Forge applies Alembic migrations and starts workers from
+`app/workers/`. The poller calls `poll_once`, waits 30 seconds between
+successful rounds, and backs off up to 60 seconds after failures. Each round
+resumes the saved cursor and drains available pages. The outbox worker calls
+`publish_pending` once per interval, sending due pending events through
+`LoggingSender`, marking successful deliveries as sent, and retrying delivery
+errors with capped exponential delays.
 
 ## Docker setup
 
