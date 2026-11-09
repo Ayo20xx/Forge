@@ -31,7 +31,7 @@ class SenderError(Exception):
 
 @dataclass(slots=True)
 class OutboxPublisher:
-    """Publishes due events and runs the continuous publisher loop."""
+    """Publishes due outbox events."""
 
     repository: OutboxRepository
     sender: EventSender

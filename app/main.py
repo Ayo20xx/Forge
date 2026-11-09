@@ -4,7 +4,8 @@ import asyncio
 from collections.abc import AsyncIterator
 from threading import Event, Thread
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.db import SessionLocal
@@ -13,6 +14,13 @@ from app.repository.ingest import IngestionRepository
 from app.repository.outbox import OutboxRepository
 from app.repository.polling import PollingRepository
 from app.routers import admin, bank_accounts
+from app.services.bank_accounts import (
+    BankAccountAmbiguous,
+    BankAccountConflictError,
+    BankAccountMismatch,
+    BankAccountNotFound,
+    BankUnavailable,
+)
 from app.services.bank_client import PollingBankClient
 from app.services.outbox_publisher import LoggingSender, OutboxPublisher
 from app.services.transaction_ingestion import TransactionIngestionService
@@ -66,6 +74,20 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Forge", lifespan=lifespan)
 app.include_router(admin.router)
 app.include_router(bank_accounts.router)
+
+
+def _service_error_response(status_code: int):
+    async def handler(_: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=status_code, content={"detail": str(exc)})
+
+    return handler
+
+
+app.add_exception_handler(BankAccountNotFound, _service_error_response(404))
+app.add_exception_handler(BankAccountAmbiguous, _service_error_response(409))
+app.add_exception_handler(BankAccountConflictError, _service_error_response(409))
+app.add_exception_handler(BankUnavailable, _service_error_response(502))
+app.add_exception_handler(BankAccountMismatch, _service_error_response(502))
 
 
 @app.get("/health")

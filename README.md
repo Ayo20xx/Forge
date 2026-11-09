@@ -65,7 +65,8 @@ parked events, and bank cursor as one transaction. Duplicate transaction IDs
 are ignored, and only booked EUR credits are accepted for mapped accounts.
 Routers in `app/routers/` delegate account routes to `BankAccountService` in
 `app/services/bank_accounts.py`, which coordinates bank-client calls,
-repository operations, and HTTP error mapping. `TransactionIngestionService`
+repository operations, and raises service-level exceptions; the HTTP app maps
+those exceptions to response status codes. `TransactionIngestionService`
 in `app/services/transaction_ingestion.py` normalizes imported transaction
 pages and performs one polling round, while `OutboxPublisher` in
 `app/services/outbox_publisher.py` publishes pending events. The repository

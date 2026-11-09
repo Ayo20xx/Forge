@@ -2,12 +2,13 @@
 
 from fastapi import APIRouter, Depends
 
+from app.routers.dependencies import get_bank_account_service
 from app.schemas.bank_accounts import (
     BankAccountCreate,
     BankAccountResponse,
     ReconciliationResponse,
 )
-from app.services.bank_accounts import BankAccountService, get_bank_account_service
+from app.services.bank_accounts import BankAccountService
 
 router = APIRouter(prefix="/bank-accounts", tags=["bank accounts"])
 

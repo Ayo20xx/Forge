@@ -11,7 +11,8 @@ from app.db import get_bank_account_repository
 from app.main import app
 from app.models import BankAccount, BankTransaction, Base
 from app.repository.bank_accounts import BankAccountRepository
-from app.services.bank_client import BankError, PollingBankClient, get_bank_client
+from app.routers.dependencies import get_bank_client
+from app.services.bank_client import BankError, PollingBankClient
 
 
 def account_data(
@@ -201,6 +202,60 @@ def test_reconciliation_compares_sum_of_deposits_with_bank_balance(api_context):
     assert response.json()["stored_total_minor"] == 1250
     assert response.json()["bank_balance_minor"] == 1250
     assert response.json()["matches"] is True
+
+
+def test_reconciliation_returns_not_found_for_unknown_account(api_context):
+    client, _, _ = api_context
+
+    response = client.get("/bank-accounts/missing/reconciliation")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Bank account not found"
+
+
+def test_reconciliation_rejects_ambiguous_account_ids(api_context):
+    client, session, _ = api_context
+    session.add_all(
+        [
+            BankAccount(
+                bank_id="polling-bank",
+                account_id="shared-account",
+                iban="DE89370400440532013000",
+                customer_reference="customer-1",
+            ),
+            BankAccount(
+                bank_id="other-bank",
+                account_id="shared-account",
+                iban="DE89370400440532013001",
+                customer_reference="customer-2",
+            ),
+        ]
+    )
+    session.commit()
+
+    response = client.get("/bank-accounts/shared-account/reconciliation")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Account ID is ambiguous across banks"
+
+
+def test_reconciliation_rejects_bank_response_for_different_account(api_context):
+    client, session, bank_client = api_context
+    session.add(
+        BankAccount(
+            bank_id="polling-bank",
+            account_id="account-1",
+            iban="DE89370400440532013000",
+            customer_reference="customer-1",
+        )
+    )
+    session.commit()
+    bank_client.account = account_data(customer_reference="different-customer")
+
+    response = client.get("/bank-accounts/account-1/reconciliation")
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Bank returned a mismatched account"
 
 
 @pytest.mark.parametrize(
