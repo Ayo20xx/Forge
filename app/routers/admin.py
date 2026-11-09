@@ -13,4 +13,5 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 def sync_accounts(
     service: BankAccountService = Depends(get_bank_account_service),
 ) -> SyncResponse:
-    return service.sync_accounts()
+    accounts = service.sync_accounts()
+    return SyncResponse(imported_count=len(accounts), accounts=accounts)

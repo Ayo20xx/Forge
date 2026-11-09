@@ -2,14 +2,9 @@
 
 from dataclasses import dataclass
 
+from app.models import BankAccount
 from app.repository.bank_accounts import BankAccountConflict, BankAccountRepository
-from app.schemas.admin import SyncResponse
-from app.schemas.bank_accounts import (
-    BankAccountCreate,
-    BankAccountData,
-    BankAccountResponse,
-    ReconciliationResponse,
-)
+from app.schemas.bank_accounts import BankAccountData
 from app.services.bank_client import BankError, PollingBankClient
 
 
@@ -33,6 +28,17 @@ class BankAccountConflictError(Exception):
     """Raised when a bank account conflicts with an existing local mapping."""
 
 
+@dataclass(frozen=True, slots=True)
+class ReconciliationResult:
+    """Comparison of the locally stored total and the bank's balance snapshot."""
+
+    account_id: str
+    stored_total_minor: int
+    bank_balance_minor: int
+    difference_minor: int
+    matches: bool
+
+
 @dataclass(slots=True)
 class BankAccountService:
     """Orchestrates business operations for bank accounts."""
@@ -40,11 +46,11 @@ class BankAccountService:
     repository: BankAccountRepository
     bank_client: PollingBankClient
 
-    def create_bank_account(self, body: BankAccountCreate) -> BankAccountResponse:
+    def create_bank_account(self, customer_reference: str) -> BankAccount:
         """Create an account at the bank and store its local mapping."""
         try:
             account = BankAccountData.model_validate(
-                self.bank_client.create_account(body.customer_reference)
+                self.bank_client.create_account(customer_reference)
             )
             saved = self.repository.create_bank_account(account)
         except BankError as exc:
@@ -52,9 +58,9 @@ class BankAccountService:
         except BankAccountConflict as exc:
             raise BankAccountConflictError(str(exc)) from exc
 
-        return BankAccountResponse.model_validate(saved)
+        return saved
 
-    def sync_accounts(self) -> SyncResponse:
+    def sync_accounts(self) -> list[BankAccount]:
         """Import existing bank accounts without interpreting their core references."""
         try:
             accounts = [
@@ -67,12 +73,9 @@ class BankAccountService:
         except BankAccountConflict as exc:
             raise BankAccountConflictError(str(exc)) from exc
 
-        return SyncResponse(
-            imported_count=len(imported),
-            accounts=[BankAccountResponse.model_validate(account) for account in imported],
-        )
+        return imported
 
-    def reconcile_bank_account(self, account_id: str) -> ReconciliationResponse:
+    def reconcile_bank_account(self, account_id: str) -> ReconciliationResult:
         """Compare stored transaction total with the bank's current booked balance."""
         bank_accounts = self.repository.find_bank_accounts(account_id)
         if not bank_accounts:
@@ -98,7 +101,7 @@ class BankAccountService:
         # booked_balance_minor is only a comparison snapshot, never a ledger credit.
         stored_total = self.repository.stored_transaction_total(bank_account.id)
         bank_total = bank_snapshot.booked_balance_minor
-        return ReconciliationResponse(
+        return ReconciliationResult(
             account_id=bank_account.account_id,
             stored_total_minor=stored_total,
             bank_balance_minor=bank_total,
