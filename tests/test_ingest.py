@@ -16,10 +16,15 @@ from app.models import (
 )
 from app.repository.ingest import IngestionRepository
 from app.repository.polling import PollingRepository
-from app.schemas.transactions import BankTransferEvent, Transfer
+from app.schemas.transactions import BankTransferEvent, TransactionPage, Transfer
 from app.services.transaction_ingestion import TransactionIngestionService
 
 BANK_ID = "polling-bank"
+
+
+class UnusedTransactionSource:
+    def get_transactions(self, *, after: int) -> TransactionPage:
+        raise AssertionError(f"transaction source should not be called after cursor {after}")
 
 
 @pytest.fixture
@@ -50,6 +55,7 @@ def ingestion_service(db_session, repository):
     return TransactionIngestionService(
         ingestion_repository=repository,
         polling_repository=PollingRepository(db_session.info["test_session_factory"]),
+        bank_client=UnusedTransactionSource(),
     )
 
 

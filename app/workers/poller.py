@@ -7,7 +7,6 @@ from typing import Protocol
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.bank_client import BankError
-from app.services.transaction_ingestion import TransactionSource
 from app.workers.common import StopSignal
 
 logger = logging.getLogger(__name__)
@@ -16,12 +15,11 @@ MAX_BACKOFF_SECONDS = 60
 
 
 class PollingService(Protocol):
-    def poll_once(self, bank_client: TransactionSource) -> None: ...
+    def poll_once(self) -> bool: ...
 
 
 def run_poller(
     ingestion_service: PollingService,
-    bank_client: TransactionSource,
     interval_seconds: int = 30,
     stop_event: StopSignal | None = None,
 ) -> None:
@@ -33,7 +31,9 @@ def run_poller(
 
     while not stop.is_set():
         try:
-            ingestion_service.poll_once(bank_client)
+            has_more = ingestion_service.poll_once()
+            while has_more and not stop.is_set():
+                has_more = ingestion_service.poll_once()
         except (BankError, SQLAlchemyError, ValueError):
             logger.exception(
                 "Polling Bank ingestion failed; retrying in %s seconds",

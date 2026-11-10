@@ -19,6 +19,7 @@ class TransactionIngestionService:
 
     ingestion_repository: IngestionRepository
     polling_repository: PollingRepository
+    bank_client: TransactionSource
 
     def ingest_batch(
         self,
@@ -51,21 +52,17 @@ class TransactionIngestionService:
 
         self.ingestion_repository.ingest_batch(transfers, next_cursor, bank_id)
 
-    def poll_once(self, bank_client: TransactionSource) -> None:
-        """Fetch and ingest all pages available after the saved cursor."""
+    def poll_once(self) -> bool:
+        """Fetch and ingest one page, returning whether another page is available."""
         expected_bank_id, cursor = self.polling_repository.latest_cursor()
-        while True:
-            page = bank_client.get_transactions(after=cursor)
-            self._validate_page(page, cursor, expected_bank_id)
-            self.ingest_batch(
-                page.data,
-                page.next_cursor,
-                bank_id=page.bank_id,
-            )
-            expected_bank_id = page.bank_id
-            cursor = page.next_cursor
-            if not page.has_more:
-                return
+        page = self.bank_client.get_transactions(after=cursor)
+        self._validate_page(page, cursor, expected_bank_id)
+        self.ingest_batch(
+            page.data,
+            page.next_cursor,
+            bank_id=page.bank_id,
+        )
+        return page.has_more
 
     @staticmethod
     def _validate_page(

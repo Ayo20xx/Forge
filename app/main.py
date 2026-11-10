@@ -39,13 +39,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     ingestion_service = TransactionIngestionService(
         ingestion_repository=ingestion_repository,
         polling_repository=polling_repository,
+        bank_client=bank_client,
     )
     outbox_publisher_service = OutboxPublisher(outbox_repository, logging_sender)
     poller = Thread(
         target=run_poller,
         args=(
             ingestion_service,
-            bank_client,
             get_settings().poll_interval_seconds,
             stop_event,
         ),

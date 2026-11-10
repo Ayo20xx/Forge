@@ -98,9 +98,11 @@ def test_poll_once_resumes_from_cursor_and_drains_all_pages(
     service = TransactionIngestionService(
         ingestion_repository=IngestionRepository(session_factory),
         polling_repository=PollingRepository(session_factory),
+        bank_client=bank,
     )
 
-    service.poll_once(bank)
+    assert service.poll_once()
+    assert not service.poll_once()
 
     assert bank.after_values == [5, 9]
     assert read_cursor(session_factory) == 12
@@ -122,12 +124,13 @@ def test_poll_once_can_retry_bank_error_without_advancing_cursor(
     service = TransactionIngestionService(
         ingestion_repository=IngestionRepository(session_factory),
         polling_repository=PollingRepository(session_factory),
+        bank_client=bank,
     )
 
     with pytest.raises(BankError, match="temporary failure"):
-        service.poll_once(bank)
+        service.poll_once()
     assert read_cursor(session_factory) is None
-    service.poll_once(bank)
+    assert not service.poll_once()
 
     assert bank.after_values == [0, 0]
     assert read_cursor(session_factory) == 4
@@ -135,17 +138,33 @@ def test_poll_once_can_retry_bank_error_without_advancing_cursor(
 
 def test_poller_caps_retry_backoff_at_sixty_seconds():
     class AlwaysFailingService:
-        def poll_once(self, _bank_client: TransactionSource) -> None:
+        def poll_once(self) -> bool:
             raise BankError("bank unavailable")
 
     stop = StopAfterWait(8)
     run_poller(
         AlwaysFailingService(),
-        FakeBank([]),
         stop_event=stop,
     )
 
     assert stop.waits == [1, 2, 4, 8, 16, 32, 60, 60]
+
+
+def test_poller_stops_between_pages():
+    stop = Event()
+
+    class StopAfterFirstPage:
+        calls = 0
+
+        def poll_once(self) -> bool:
+            self.calls += 1
+            stop.set()
+            return True
+
+    service = StopAfterFirstPage()
+    run_poller(service, stop_event=stop)
+
+    assert service.calls == 1
 
 
 @pytest.mark.parametrize(
@@ -166,6 +185,7 @@ def test_poll_once_rejects_invalid_pages_without_advancing_cursor(
         calls = 0
 
         def get_transactions(self, *, after: int) -> TransactionPage:
+            assert after == 0
             self.calls += 1
             return parse_page(invalid_page) if self.calls == 1 else page(3, has_more=False)
 
@@ -173,12 +193,13 @@ def test_poll_once_rejects_invalid_pages_without_advancing_cursor(
     service = TransactionIngestionService(
         ingestion_repository=IngestionRepository(session_factory),
         polling_repository=PollingRepository(session_factory),
+        bank_client=bank,
     )
 
     with pytest.raises((ValueError, BankError)):
-        service.poll_once(bank)
+        service.poll_once()
     assert read_cursor(session_factory) == 0
-    service.poll_once(bank)
+    assert not service.poll_once()
 
     assert read_cursor(session_factory) == 3
 
@@ -191,8 +212,8 @@ def test_poller_rejects_non_positive_interval(
             TransactionIngestionService(
                 ingestion_repository=IngestionRepository(session_factory),
                 polling_repository=PollingRepository(session_factory),
+                bank_client=FakeBank([]),
             ),
-            FakeBank([]),
             interval_seconds=0,
             stop_event=Event(),
         )
