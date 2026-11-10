@@ -63,6 +63,8 @@ original event payload for auditing.
 `ingest_batch` commits each page's mapped transactions, pending outbox messages,
 parked events, and bank cursor as one transaction. Duplicate transaction IDs
 are ignored, and only booked EUR credits are accepted for mapped accounts.
+<img width="4219" height="1305" alt="Untitled-2026-11-09-0934" src="https://github.com/user-attachments/assets/5fbbef4c-f2b8-4524-a6ae-5229fb60262b" />
+
 Routers in `app/routers/` delegate account routes to `BankAccountService` in
 `app/services/bank_accounts.py`, which coordinates bank-client calls,
 repository operations, and raises service-level exceptions; the HTTP app maps
