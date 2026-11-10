@@ -2,20 +2,17 @@
 
 import logging
 from threading import Event
-from typing import Protocol
 
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.outbox_publisher import OutboxPublisher
+from app.workers.common import StopSignal
 
 logger = logging.getLogger(__name__)
 PUBLISH_INTERVAL_SECONDS = 1
 
 
-class StopSignal(Protocol):
-    def is_set(self) -> bool: ...
 
-    def wait(self, timeout: float) -> bool: ...
 
 
 def run_outbox_publisher(

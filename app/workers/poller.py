@@ -8,15 +8,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.bank_client import BankError
 from app.services.transaction_ingestion import TransactionSource
+from app.workers.common import StopSignal
 
 logger = logging.getLogger(__name__)
 MAX_BACKOFF_SECONDS = 60
 
-
-class StopSignal(Protocol):
-    def is_set(self) -> bool: ...
-
-    def wait(self, timeout: float) -> bool: ...
 
 
 class PollingService(Protocol):
