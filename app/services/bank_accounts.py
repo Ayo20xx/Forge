@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.models import BankAccount
-from app.repository.bank_accounts import BankAccountConflict, BankAccountRepository
+from app.repository.bank_accounts import BankAccountRepository, MappingConflict
 from app.schemas.bank_accounts import BankAccountData
 from app.services.bank_client import BankError
 
@@ -64,7 +64,7 @@ class BankAccountService:
             saved = self.repository.create_bank_account(account)
         except BankError as exc:
             raise BankUnavailable("Bank account creation failed") from exc
-        except BankAccountConflict as exc:
+        except MappingConflict as exc:
             raise BankAccountConflictError(str(exc)) from exc
 
         return saved
@@ -76,7 +76,7 @@ class BankAccountService:
             imported = self.repository.sync_bank_accounts(accounts)
         except BankError as exc:
             raise BankUnavailable("Bank account sync failed") from exc
-        except BankAccountConflict as exc:
+        except MappingConflict as exc:
             raise BankAccountConflictError(str(exc)) from exc
 
         return imported

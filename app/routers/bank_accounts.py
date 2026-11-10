@@ -17,7 +17,7 @@ router = APIRouter(prefix="/bank-accounts", tags=["bank accounts"])
 def post_bank_account(
     body: BankAccountCreate,
     service: BankAccountService = Depends(get_bank_account_service),
-) -> BankAccountResponse:
+) :
     return service.create_bank_account(body.customer_reference)
 
 

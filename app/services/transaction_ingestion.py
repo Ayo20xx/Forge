@@ -1,4 +1,4 @@
-"""Ingest bank transaction pages and run the polling loop."""
+"""Ingest bank transaction pages into the database.."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
