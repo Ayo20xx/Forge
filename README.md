@@ -4,23 +4,6 @@ Forge is a sandbox project for a Wise-style, multi-customer euro ledger. It
 connects local customer records to simulated receiving accounts at the Polling
 Bank and prepares the database, HTTP client, and test harness for implementing
 the ledger business logic.
-
-## Architecture
-
-```text
-                         +----------------------+
-                         | Polling Bank sandbox |
-                         +----------+-----------+
-                                    | HTTP / X-API-Key
-                                    v
-+-------------------+     +--------+---------+     +----------------------+
-| API / services    | --> | Repositories     | --> | PostgreSQL 16        |
-| app/routers       |     | SQLAlchemy models|     | accounts, events,   |
-| app/services     |     +------------------+     | cursors, outbox     |
-+-------------------+                               +----------------------+
-+-------------------+
-```
-
 ## Domain rules
 
 - Money is an integer number of EUR cents (`amount_minor`); never use floats.
@@ -80,14 +63,24 @@ original event payload for auditing.
 `ingest_batch` commits each page's mapped transactions, pending outbox messages,
 parked events, and bank cursor as one transaction. Duplicate transaction IDs
 are ignored, and only booked EUR credits are accepted for mapped accounts.
-Service-specific modules in `app/repository/` own database queries and
-transaction boundaries. At application startup, Forge applies Alembic
-migrations and starts a background poller. It resumes the saved cursor, drains
-pages, waits 30 seconds between successful polls, and backs off up to 60 seconds
-after failures.
-The outbox publisher also starts at application startup. It sends due pending
-events through `LoggingSender`, marks successful deliveries as sent, and
-retries delivery errors with capped exponential delays.
+<img width="4219" height="1305" alt="Untitled-2026-11-09-0934" src="https://github.com/user-attachments/assets/5fbbef4c-f2b8-4524-a6ae-5229fb60262b" />
+
+Routers in `app/routers/` delegate account routes to `BankAccountService` in
+`app/services/bank_accounts.py`, which coordinates bank-client calls,
+repository operations, and raises service-level exceptions; the HTTP app maps
+those exceptions to response status codes. `TransactionIngestionService`
+in `app/services/transaction_ingestion.py` normalizes imported transaction
+pages and performs one polling round, while `OutboxPublisher` in
+`app/services/outbox_publisher.py` publishes pending events. The repository
+modules own database queries and transaction boundaries, while
+`app/services/bank_client.py` owns Polling Bank HTTP communication. At
+application startup, Forge applies Alembic migrations and starts workers from
+`app/workers/`. The poller calls `poll_once`, waits 30 seconds between
+successful rounds, and backs off up to 60 seconds after failures. Each round
+resumes the saved cursor and drains available pages. The outbox worker calls
+`publish_pending` once per interval, sending due pending events through
+`LoggingSender`, marking successful deliveries as sent, and retrying delivery
+errors with capped exponential delays.
 
 ## Docker setup
 

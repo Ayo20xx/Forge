@@ -10,7 +10,7 @@ from app.models import BankAccount, BankTransaction
 from app.schemas.bank_accounts import BankAccountData
 
 
-class BankAccountConflict(Exception):
+class MappingConflict(Exception):
     """Raised when a bank account conflicts with an existing local mapping."""
 
 
@@ -40,7 +40,7 @@ class BankAccountRepository:
                 existing_by_id.customer_reference != account.customer_reference
                 or existing_by_id.iban != account.iban
             ):
-                raise BankAccountConflict(
+                raise MappingConflict(
                     "Bank account conflicts with its existing mapping"
                 )
             return existing_by_id
@@ -50,7 +50,7 @@ class BankAccountRepository:
                 existing_by_reference.account_id != account.account_id
                 or existing_by_reference.iban != account.iban
             ):
-                raise BankAccountConflict(
+                raise MappingConflict(
                     "Customer reference conflicts with its existing bank account"
                 )
             return existing_by_reference
@@ -70,7 +70,7 @@ class BankAccountRepository:
             with self._session_factory.begin() as session:
                 return self._save_bank_account(session, account)
         except IntegrityError as exc:
-            raise BankAccountConflict(
+            raise MappingConflict(
                 "Bank account conflicts with an existing mapping"
             ) from exc
 
@@ -81,7 +81,7 @@ class BankAccountRepository:
             with self._session_factory.begin() as session:
                 return [self._save_bank_account(session, account) for account in accounts]
         except IntegrityError as exc:
-            raise BankAccountConflict(
+            raise MappingConflict(
                 "Bank account conflicts with an existing mapping"
             ) from exc
 

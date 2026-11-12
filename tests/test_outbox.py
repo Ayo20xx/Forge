@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.models import BankAccount, BankTransaction, Base, OutboxEvent
 from app.repository.outbox import OutboxRepository
-from app.services.outbox import LoggingSender, SenderError, publish_pending
+from app.services.outbox_publisher import LoggingSender, OutboxPublisher, SenderError
 
 NOW = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 
@@ -76,7 +76,9 @@ def test_publisher_sends_due_event_and_marks_it_sent(session_factory, caplog):
     caplog.set_level("INFO")
     event_id = add_outbox_event(session_factory)
 
-    published = publish_pending(OutboxRepository(session_factory), LoggingSender(), now=NOW)
+    published = OutboxPublisher(
+        OutboxRepository(session_factory), LoggingSender()
+    ).publish_pending(now=NOW)
 
     event = read_event(session_factory, event_id)
     assert published == 1
@@ -89,7 +91,9 @@ def test_publisher_sends_due_event_and_marks_it_sent(session_factory, caplog):
 def test_publisher_keeps_future_events_pending(session_factory):
     event_id = add_outbox_event(session_factory, next_attempt_at=NOW + timedelta(seconds=1))
 
-    published = publish_pending(OutboxRepository(session_factory), LoggingSender(), now=NOW)
+    published = OutboxPublisher(
+        OutboxRepository(session_factory), LoggingSender()
+    ).publish_pending(now=NOW)
 
     event = read_event(session_factory, event_id)
     assert published == 0
@@ -103,7 +107,9 @@ def test_publisher_schedules_retry_after_sender_failure(session_factory, caplog)
         def send(self, event_type: str, payload: dict[str, object]) -> None:
             raise SenderError("temporary sender failure")
 
-    published = publish_pending(OutboxRepository(session_factory), FailingSender(), now=NOW)
+    published = OutboxPublisher(
+        OutboxRepository(session_factory), FailingSender()
+    ).publish_pending(now=NOW)
 
     event = read_event(session_factory, event_id)
     assert published == 0
@@ -121,7 +127,9 @@ def test_publisher_does_not_swallow_unexpected_sender_errors(session_factory):
             raise RuntimeError("unexpected failure")
 
     with pytest.raises(RuntimeError, match="unexpected failure"):
-        publish_pending(OutboxRepository(session_factory), BrokenSender(), now=NOW)
+        OutboxPublisher(
+            OutboxRepository(session_factory), BrokenSender()
+        ).publish_pending(now=NOW)
 
     event = read_event(session_factory, event_id)
     assert event.status == "pending"
@@ -137,7 +145,9 @@ def test_publisher_retries_with_capped_exponential_delay(session_factory):
 
     for attempts in range(1, 7):
         current_time = as_utc(read_event(session_factory, event_id).next_attempt_at)
-        publish_pending(OutboxRepository(session_factory), FailingSender(), now=current_time)
+        OutboxPublisher(
+            OutboxRepository(session_factory), FailingSender()
+        ).publish_pending(now=current_time)
         event = read_event(session_factory, event_id)
         assert event.attempts == attempts
         delay = min(2**attempts, 60)
@@ -147,9 +157,9 @@ def test_publisher_retries_with_capped_exponential_delay(session_factory):
 @pytest.mark.parametrize("batch_size", [0, -1])
 def test_publisher_rejects_non_positive_batch_size(session_factory, batch_size):
     with pytest.raises(ValueError, match="batch_size must be positive"):
-        publish_pending(
-            OutboxRepository(session_factory),
-            LoggingSender(),
+        OutboxPublisher(
+            OutboxRepository(session_factory), LoggingSender()
+        ).publish_pending(
             now=NOW,
             batch_size=batch_size,
         )
@@ -157,8 +167,8 @@ def test_publisher_rejects_non_positive_batch_size(session_factory, batch_size):
 
 def test_publisher_requires_timezone_aware_now(session_factory):
     with pytest.raises(ValueError, match="now must be timezone-aware"):
-        publish_pending(
-            OutboxRepository(session_factory),
-            LoggingSender(),
+        OutboxPublisher(
+            OutboxRepository(session_factory), LoggingSender()
+        ).publish_pending(
             now=datetime(2026, 1, 2, 3, 4, 5),
         )

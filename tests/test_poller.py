@@ -11,7 +11,11 @@ from app.repository.ingest import IngestionRepository
 from app.repository.polling import PollingRepository
 from app.schemas.transactions import TransactionPage
 from app.services.bank_client import BankError
-from app.services.poller import TransactionSource, run_poller
+from app.services.transaction_ingestion import (
+    TransactionIngestionService,
+    TransactionSource,
+)
+from app.workers.poller import run_poller
 
 BANK_ID = "polling-bank"
 
@@ -86,27 +90,25 @@ def read_cursor(session_factory) -> int:
         return session.scalar(select(PollCursor.cursor).where(PollCursor.bank_id == BANK_ID))
 
 
-def test_poller_resumes_from_cursor_and_drains_all_pages(
+def test_poll_once_resumes_from_cursor_and_drains_all_pages(
     session_factory: sessionmaker[Session],
 ):
     save_cursor(session_factory, 5)
     bank = FakeBank([page(9, has_more=True), page(12, has_more=False)])
-    stop = StopAfterWait(1)
-
-    run_poller(
-        bank,
-        PollingRepository(session_factory),
-        IngestionRepository(session_factory),
-        interval_seconds=30,
-        stop_event=stop,
+    service = TransactionIngestionService(
+        ingestion_repository=IngestionRepository(session_factory),
+        polling_repository=PollingRepository(session_factory),
+        bank_client=bank,
     )
+
+    assert service.poll_once()
+    assert not service.poll_once()
 
     assert bank.after_values == [5, 9]
     assert read_cursor(session_factory) == 12
-    assert stop.waits == [30]
 
 
-def test_poller_retries_bank_errors_with_exponential_backoff(
+def test_poll_once_can_retry_bank_error_without_advancing_cursor(
     session_factory: sessionmaker[Session],
 ):
     class FailingOnceBank(TransactionSource):
@@ -119,37 +121,50 @@ def test_poller_retries_bank_errors_with_exponential_backoff(
             return page(4, has_more=False)
 
     bank = FailingOnceBank()
-    stop = StopAfterWait(2)
-
-    run_poller(
-        bank,
-        PollingRepository(session_factory),
-        IngestionRepository(session_factory),
-        interval_seconds=30,
-        stop_event=stop,
+    service = TransactionIngestionService(
+        ingestion_repository=IngestionRepository(session_factory),
+        polling_repository=PollingRepository(session_factory),
+        bank_client=bank,
     )
 
+    with pytest.raises(BankError, match="temporary failure"):
+        service.poll_once()
+    assert read_cursor(session_factory) is None
+    assert not service.poll_once()
+
     assert bank.after_values == [0, 0]
-    assert stop.waits == [1, 30]
     assert read_cursor(session_factory) == 4
 
 
-def test_poller_caps_retry_backoff_at_sixty_seconds(
-    session_factory: sessionmaker[Session],
-):
-    class AlwaysFailingBank(TransactionSource):
-        def get_transactions(self, *, after: int) -> TransactionPage:
+def test_poller_caps_retry_backoff_at_sixty_seconds():
+    class AlwaysFailingService:
+        def poll_once(self) -> bool:
             raise BankError("bank unavailable")
 
     stop = StopAfterWait(8)
     run_poller(
-        AlwaysFailingBank(),
-        PollingRepository(session_factory),
-        IngestionRepository(session_factory),
+        AlwaysFailingService(),
         stop_event=stop,
     )
 
     assert stop.waits == [1, 2, 4, 8, 16, 32, 60, 60]
+
+
+def test_poller_stops_between_pages():
+    stop = Event()
+
+    class StopAfterFirstPage:
+        calls = 0
+
+        def poll_once(self) -> bool:
+            self.calls += 1
+            stop.set()
+            return True
+
+    service = StopAfterFirstPage()
+    run_poller(service, stop_event=stop)
+
+    assert service.calls == 1
 
 
 @pytest.mark.parametrize(
@@ -161,7 +176,7 @@ def test_poller_caps_retry_backoff_at_sixty_seconds(
         {"bank_id": "different-bank", "data": [], "next_cursor": 1, "has_more": False},
     ],
 )
-def test_poller_retries_invalid_pages_without_advancing_cursor(
+def test_poll_once_rejects_invalid_pages_without_advancing_cursor(
     session_factory: sessionmaker[Session], invalid_page: dict[str, object]
 ):
     save_cursor(session_factory, 0)
@@ -170,21 +185,23 @@ def test_poller_retries_invalid_pages_without_advancing_cursor(
         calls = 0
 
         def get_transactions(self, *, after: int) -> TransactionPage:
+            assert after == 0
             self.calls += 1
             return parse_page(invalid_page) if self.calls == 1 else page(3, has_more=False)
 
     bank = InvalidThenValidBank()
-    stop = StopAfterWait(2)
-
-    run_poller(
-        bank,
-        PollingRepository(session_factory),
-        IngestionRepository(session_factory),
-        stop_event=stop,
+    service = TransactionIngestionService(
+        ingestion_repository=IngestionRepository(session_factory),
+        polling_repository=PollingRepository(session_factory),
+        bank_client=bank,
     )
 
+    with pytest.raises((ValueError, BankError)):
+        service.poll_once()
+    assert read_cursor(session_factory) == 0
+    assert not service.poll_once()
+
     assert read_cursor(session_factory) == 3
-    assert stop.waits == [1, 30]
 
 
 def test_poller_rejects_non_positive_interval(
@@ -192,9 +209,11 @@ def test_poller_rejects_non_positive_interval(
 ):
     with pytest.raises(ValueError, match="interval_seconds must be positive"):
         run_poller(
-            FakeBank([]),
-            PollingRepository(session_factory),
-            IngestionRepository(session_factory),
+            TransactionIngestionService(
+                ingestion_repository=IngestionRepository(session_factory),
+                polling_repository=PollingRepository(session_factory),
+                bank_client=FakeBank([]),
+            ),
             interval_seconds=0,
             stop_event=Event(),
         )

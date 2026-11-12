@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from typing import cast
 from urllib.parse import quote
 
@@ -120,9 +119,3 @@ class PollingBankClient:
 
     def __exit__(self, *_: object) -> None:
         self.close()
-
-
-def get_bank_client() -> Generator[PollingBankClient, None, None]:
-    """FastAPI dependency that creates and closes a Polling Bank client."""
-    with PollingBankClient() as client:
-        yield client

@@ -1,10 +1,11 @@
-"""Build the Forge FastAPI app and manage its background Polling Bank worker."""
+"""Build the Forge FastAPI app and start its background workers."""
 
 import asyncio
 from collections.abc import AsyncIterator
 from threading import Event, Thread
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.db import SessionLocal
@@ -13,9 +14,18 @@ from app.repository.ingest import IngestionRepository
 from app.repository.outbox import OutboxRepository
 from app.repository.polling import PollingRepository
 from app.routers import admin, bank_accounts
+from app.services.bank_accounts import (
+    BankAccountAmbiguous,
+    BankAccountConflictError,
+    BankAccountMismatch,
+    BankAccountNotFound,
+    BankUnavailable,
+)
 from app.services.bank_client import PollingBankClient
-from app.services.outbox import LoggingSender, run_outbox_publisher
-from app.services.poller import run_poller
+from app.services.outbox_publisher import LoggingSender, OutboxPublisher
+from app.services.transaction_ingestion import TransactionIngestionService
+from app.workers.outbox_publisher import run_outbox_publisher
+from app.workers.poller import run_poller
 
 
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -26,40 +36,58 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     polling_repository = PollingRepository(SessionLocal)
     ingestion_repository = IngestionRepository(SessionLocal)
     outbox_repository = OutboxRepository(SessionLocal)
+    ingestion_service = TransactionIngestionService(
+        ingestion_repository=ingestion_repository,
+        polling_repository=polling_repository,
+        bank_client=bank_client,
+    )
+    outbox_publisher_service = OutboxPublisher(outbox_repository, logging_sender)
     poller = Thread(
         target=run_poller,
         args=(
-            bank_client,
-            polling_repository,
-            ingestion_repository,
+            ingestion_service,
             get_settings().poll_interval_seconds,
             stop_event,
         ),
         name="forge-polling-bank",
         daemon=True,
     )
-    outbox_publisher = Thread(
+    outbox_worker = Thread(
         target=run_outbox_publisher,
-        args=(outbox_repository, logging_sender, stop_event),
+        args=(outbox_publisher_service, stop_event),
         name="forge-outbox-publisher",
         daemon=True,
     )
     try:
         poller.start()
-        outbox_publisher.start()
+        outbox_worker.start()
         yield
     finally:
         stop_event.set()
         if poller.ident is not None:
             await asyncio.to_thread(poller.join)
-        if outbox_publisher.ident is not None:
-            await asyncio.to_thread(outbox_publisher.join)
+        if outbox_worker.ident is not None:
+            await asyncio.to_thread(outbox_worker.join)
         bank_client.close()
 
 
 app = FastAPI(title="Forge", lifespan=lifespan)
 app.include_router(admin.router)
 app.include_router(bank_accounts.router)
+
+
+def _service_error_response(status_code: int):
+    async def handler(_: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=status_code, content={"detail": str(exc)})
+
+    return handler
+
+
+app.add_exception_handler(BankAccountNotFound, _service_error_response(404))
+app.add_exception_handler(BankAccountAmbiguous, _service_error_response(409))
+app.add_exception_handler(BankAccountConflictError, _service_error_response(409))
+app.add_exception_handler(BankUnavailable, _service_error_response(502))
+app.add_exception_handler(BankAccountMismatch, _service_error_response(502))
 
 
 @app.get("/health")
